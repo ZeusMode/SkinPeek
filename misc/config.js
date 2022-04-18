@@ -31,12 +31,14 @@ export const loadConfig = (filename="config.json") => {
     applyConfig(loadedConfig, "token", "token goes here");
     applyConfig(loadedConfig, "fetchSkinPrices", true);
     applyConfig(loadedConfig, "fetchSkinRarities", true);
+    applyConfig(loadedConfig, "localiseSkinNames", true);
     applyConfig(loadedConfig, "linkItemImage", true);
     applyConfig(loadedConfig, "useEmojisFromServer", "");
     applyConfig(loadedConfig, "refreshSkins", "10 0 0 * * *");
     applyConfig(loadedConfig, "checkGameVersion", "*/15 * * * *");
     applyConfig(loadedConfig, "cleanupAccounts", "0 * * * *");
     applyConfig(loadedConfig, "delayBetweenAlerts", 5 * 1000);
+    applyConfig(loadedConfig, "alertsPerPage", 10);
     applyConfig(loadedConfig, "emojiCacheExpiration", 10 * 1000);
     applyConfig(loadedConfig, "useLoginQueue", false);
     applyConfig(loadedConfig, "loginQueue", "*/3 * * * * *");

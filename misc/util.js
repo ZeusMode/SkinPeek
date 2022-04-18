@@ -1,5 +1,10 @@
+import {rarityEmoji} from "../discord/emoji.js";
+import {MessageActionRow, MessageButton, Permissions, Util} from "discord.js";
+import {getItem} from "../valorant/cache.js";
+
 import https from "https";
 import fs from "fs";
+import {l} from "./languages.js";
 
 const tlsCiphers = [
     "TLS_AES_128_GCM_SHA256",
@@ -151,21 +156,17 @@ export const formatBundle = async (rawBundle) => {
 
 // discord utils
 
-import {rarityEmoji} from "../discord/emoji.js";
-import {MessageActionRow, MessageButton, Permissions, Util} from "discord.js";
-import {getItem} from "../valorant/cache.js";
-
 export const defer = async (interaction, ephemeral=false) => {
-    // discord only sets deferred to true once the event
-    // is sent over ws, which doesn't happen immediately
+    // discord only sets deferred to true once the event is sent over ws, which doesn't happen immediately
     await interaction.deferReply({ephemeral});
     interaction.deferred = true;
 }
 
-export const skinNameAndEmoji = async (skin, channel) => {
-    if(!skin.rarity) return skin.name;
+export const skinNameAndEmoji = async (skin, channel, locale='en-GB') => {
+    const name = l(skin.names, locale);
+    if(!skin.rarity) return name;
     const rarityIcon = await rarityEmoji(channel, skin.rarity.name, skin.rarity.icon, externalEmojisAllowed(channel));
-    return rarityIcon ? `${rarityIcon} ${skin.name}` : skin.name;
+    return rarityIcon ? `${rarityIcon} ${name}` : name;
 }
 
 export const actionRow = (button) => new MessageActionRow().addComponents(button);
@@ -185,6 +186,8 @@ export const canSendMessages = (channel) => {
     const permissions = channel.permissionsFor(channel.guild.me);
     return permissions.has(Permissions.FLAGS.VIEW_CHANNEL) && permissions.has(Permissions.FLAGS.SEND_MESSAGES) && permissions.has(Permissions.FLAGS.EMBED_LINKS);
 }
+
+export const canEditInteraction = (interaction) => Date.now() - interaction.createdTimestamp < 14.8 * 60 * 1000;
 
 export const escapeMarkdown = Util.escapeMarkdown;
 

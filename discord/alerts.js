@@ -1,5 +1,5 @@
 import {removeAlertActionRow, skinNameAndEmoji, wait} from "../misc/util.js";
-import {getUserList} from "../valorant/auth.js";
+import {deleteUser, getUser, getUserList} from "../valorant/auth.js";
 import {getOffers} from "../valorant/shop.js";
 import {getSkin} from "../valorant/cache.js";
 import fs from "fs";
@@ -44,6 +44,33 @@ export const alertsForUser = (id) => {
     return alerts.filter(alert => alert.id === id);
 }
 
+export const filteredAlertsForUser = async (interaction) => {
+    let alerts = alertsForUser(interaction.user.id);
+
+    // filter out alerts for deleted channels
+    const removedChannels = [];
+    for(const alert of alerts) {
+        if(removedChannels.includes(alert.channel_id)) continue;
+
+        const channel = await client.channels.fetch(alert.channel_id).catch(() => {});
+        if(!channel) {
+            removeAlertsInChannel(alert.channel_id);
+            removedChannels.push(alert.channel_id);
+        }
+    }
+    if(removedChannels.length) alerts = alertsForUser(interaction.user.id);
+
+    // bring the alerts in this channel to the top
+    const alertPriority = (alert) => {
+        if(alert.channel_id === interaction.channelId) return 2;
+        if(interaction.guild && client.channels.cache.get(alert.channel_id).guildId === interaction.guild.id) return 1;
+        return 0;
+    }
+    alerts.sort((alert1, alert2) => alertPriority(alert2) - alertPriority(alert1));
+
+    return alerts;
+}
+
 export const alertsForGuild = async (id) => {
     const alertsInGuild = [];
 
@@ -86,6 +113,8 @@ export const checkAlerts = async () => {
             const offers = await getOffers(id);
             if(!offers.success) {
                 if(offers.maintenance) return; // retry in a few hours?
+
+                // user login is invalid
                 const channelsSent = [];
                 for(const alert of userAlerts) {
                     if(!channelsSent.includes(alert.channel_id)) {
@@ -93,6 +122,7 @@ export const checkAlerts = async () => {
                         channelsSent.push(alert.channel_id);
                     }
                 }
+                deleteUser(id);
                 await wait(config.delayBetweenAlerts);
                 continue;
             }
@@ -124,17 +154,18 @@ const sendAlert = async (alerts, expires) => {
             continue;
         }
 
+        const valorantUser = getUser(alert.id);
         const skin = await getSkin(alert.uuid);
         await channel.send({
             content: `<@${alert.id}>`,
             embeds: [{
-                description: s().info.ALERT_HAPPENED.f({u: alert.id, s: await skinNameAndEmoji(skin, channel), t: expires}),
+                description: s(valorantUser.locale).info.ALERT_HAPPENED.f({u: alert.id, s: await skinNameAndEmoji(skin, channel, valorantUser.locale), t: expires}),
                 color: VAL_COLOR_1,
                 thumbnail: {
                     url: skin.icon
                 }
             }],
-            components: [removeAlertActionRow(alert.id, alert.uuid, s().info.REMOVE_ALERT_BUTTON)]
+            components: [removeAlertActionRow(alert.id, alert.uuid, s(valorantUser.locale).info.REMOVE_ALERT_BUTTON)]
         }).catch(async e => {
             console.error(`Could not send alert message in #${channel.name}! Do I have the right role?`);
 
@@ -156,10 +187,14 @@ const sendCredentialsExpired = async (alert) => {
         return removeAlertsInChannel(alert.channel_id);
     }
 
+    const memberInGuild = await channel.guild.members.fetch(alert.id).catch(() => {});
+    if(!memberInGuild) return;
+
+    const valorantUser = getUser(alert.id);
     await channel.send({
         content: `<@${alert.id}>`,
         embeds: [{
-            description: s().error.AUTH_ERROR_ALERTS_HAPPENED.f({u: alert.id}),
+            description: s(valorantUser.locale).error.AUTH_ERROR_ALERTS_HAPPENED.f({u: alert.id}),
             color: VAL_COLOR_1,
         }]
     }).catch(async e => {
