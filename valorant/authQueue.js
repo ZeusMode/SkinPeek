@@ -12,6 +12,7 @@ export const Operations = {
 const queue = [];
 const queueResults = [];
 let queueCounter = 0;
+let processingCount = 0;
 
 export const queueUsernamePasswordLogin = async (id, username, password) => {
     if(!config.useLoginQueue) return {inQueue: false, ...await redeemUsernamePassword(id, username, password)};
@@ -20,7 +21,9 @@ export const queueUsernamePasswordLogin = async (id, username, password) => {
         operation: Operations.USERNAME_PASSWORD,
         c, id, username, password,
     });
-    console.debug(`Added Username+Password login to queue for user ${id} (c=${c})`);
+    console.log(`Added Username+Password login to auth queue for user ${id} (c=${c})`);
+
+    if(processingCount === 0) await processAuthQueue();
     return {inQueue: true, c};
 }
 
@@ -31,7 +34,9 @@ export const queue2FACodeRedeem = async (id, code) => {
         operation: Operations.MFA,
         c, id, code
     });
-    console.debug(`Added 2fa code redeem to queue for user ${id} (c=${c})`);
+    console.log(`Added 2fa code redeem to auth queue for user ${id} (c=${c})`);
+
+    if(processingCount === 0) await processAuthQueue();
     return {inQueue: true, c};
 }
 
@@ -42,7 +47,9 @@ export const queueCookiesLogin = async (id, cookies) => {
         operation: Operations.COOKIES,
         c, id, cookies
     });
-    console.debug(`Added cookie login to queue for user ${id} (c=${c})`);
+    console.log(`Added cookie login to auth queue for user ${id} (c=${c})`);
+
+    if(processingCount === 0) await processAuthQueue();
     return {inQueue: true, c};
 }
 
@@ -53,15 +60,18 @@ export const queueNullOperation = async (timeout) => {  // used for stress-testi
         operation: Operations.NULL,
         c, timeout
     });
-    console.debug(`Added null operation to queue with timeout ${timeout} (c=${c})`);
+    console.log(`Added null operation to auth queue with timeout ${timeout} (c=${c})`);
+
+    if(processingCount === 0) await processAuthQueue();
     return {inQueue: true, c};
 }
 
-export const processQueue = async () => {
+export const processAuthQueue = async () => {
     if(!config.useLoginQueue || !queue.length) return;
 
     const item = queue.shift();
-    console.debug(`Processing queue item "${item.operation}" for ${item.id} (c=${item.c})`);
+    console.log(`Processing auth queue item "${item.operation}" for ${item.id} (c=${item.c})`);
+    processingCount++;
 
     let result;
     try {
@@ -88,9 +98,12 @@ export const processQueue = async () => {
         c: item.c,
         result
     });
+
+    console.log(`Finished processing auth queue item "${item.operation}" for ${item.id} (c=${item.c})`);
+    processingCount--;
 }
 
-export const getQueueItemStatus = (c) => {
+export const getAuthQueueItemStatus = (c) => {
     let item = queue.find(i => i.c === c);
     if(item) return {processed: false, remaining: queue[0].c - c};
 
